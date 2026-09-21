@@ -1,0 +1,24 @@
+{
+  "model": "U-Net",
+  "encoder": "ResNet-34",
+  "dataset": "SpaceNet 5 Mumbai AOI_8_Mumbai",
+  "train_images": 812,
+  "validation_images": 204,
+  "image_size": 512,
+  "batch_size": 4,
+  "epochs_requested": 50,
+  "epochs_completed": 50,
+  "learning_rate": 0.0001,
+  "weight_decay": 0.0001,
+  "loss": {
+    "dice": 0.5,
+    "bce": 0.3,
+    "focal": 0.2
+  },
+  "best_validation_dice": 0.6299653655173731,
+  "best_threshold": 0.25,
+  "best_iou": 0.5383861660957336,
+  "best_precision": 0.6202012493329889,
+  "best_recall": 0.7053078769468794,
+  "checkpoint": "/content/drive/MyDrive/RESQROUTE/models/resqroute_unet_resnet34_v2_best.pth"
+}

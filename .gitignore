@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python & Environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+.env
+
+# Datasets, Database & Heavy AI Artifacts
+backend/ai/dataset2/
+backend/ai/datasets/
+backend/ai/outputs/
+backend/ai/tensorboard/
+backend/ai/weights/
+data/
+dataset/
+datasets/
+*.db
+*.sqlite
+*.sqlite3
+*.pth
+*.pt
+*.onnx
+*.h5
+*.ckpt
+*.tfevents*
+*.npy
+
+# Logs & Temp files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor & OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
