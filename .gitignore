@@ -28,7 +28,14 @@ datasets/
 *.db
 *.sqlite
 *.sqlite3
+# Ignore PyTorch checkpoints by default
 *.pth
+
+# Production RESQROUTE model
+!backend/
+!backend/ai/
+!backend/ai/models/
+!backend/ai/models/resqroute_unet_resnet34_v2_best.pth
 *.pt
 *.onnx
 *.h5
