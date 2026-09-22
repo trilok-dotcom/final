@@ -47,7 +47,7 @@ pnpm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea/
-.DS_Store
+cloudflared.exe
 *.suo
 *.ntvs*
 *.njsproj

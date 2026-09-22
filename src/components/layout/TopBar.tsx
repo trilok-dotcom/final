@@ -1,5 +1,6 @@
 import React from 'react';
-import { ShieldAlert, Bell, MapPin, UserCheck, Activity } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { ShieldAlert, Bell, MapPin, UserCheck, Activity, Truck } from 'lucide-react';
 
 interface TopBarProps {
   onToggleSidebar?: () => void;
@@ -31,10 +32,35 @@ export const TopBar: React.FC<TopBarProps> = () => {
 
         <div className="h-5 w-px bg-slate-800 mx-2 hidden sm:block" />
 
-        {/* Status Indicator */}
-        <div className="hidden sm:flex items-center space-x-2 bg-emerald-950/40 border border-emerald-800/50 px-2.5 py-1 rounded text-xs font-mono text-emerald-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-semibold tracking-wide text-[11px]">SYSTEM OPERATIONAL</span>
+        {/* Workflow Action Buttons */}
+        <div className="flex items-center space-x-2">
+          <NavLink
+            to="/request-rescue"
+            className={({ isActive }) =>
+              `px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center space-x-1.5 border transition-all ${
+                isActive
+                  ? 'bg-red-500 text-white border-red-400 shadow-md shadow-red-500/20'
+                  : 'bg-red-950/40 text-red-300 border-red-800/60 hover:bg-red-900/60'
+              }`
+            }
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+            <span>🚨 REQUEST RESCUE</span>
+          </NavLink>
+
+          <NavLink
+            to="/rescuer-mode"
+            className={({ isActive }) =>
+              `px-2.5 py-1 rounded text-xs font-mono font-bold flex items-center space-x-1.5 border transition-all ${
+                isActive
+                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/20'
+                  : 'bg-cyan-950/40 text-cyan-300 border-cyan-800/60 hover:bg-cyan-900/60'
+              }`
+            }
+          >
+            <Truck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>🚑 RESCUER</span>
+          </NavLink>
         </div>
       </div>
 

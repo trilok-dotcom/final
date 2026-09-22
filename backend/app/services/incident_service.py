@@ -82,6 +82,7 @@ class IncidentService:
         inc_id = f"inc-{uuid.uuid4().hex[:8]}"
         code = cls.generate_incident_code()
         now_iso = datetime.utcnow().isoformat() + "Z"
+        ts = data.timestamp or now_iso
 
         conn = get_db_connection()
         try:
@@ -91,8 +92,9 @@ class IncidentService:
                 INSERT INTO incidents (
                     id, incident_code, incident_type, severity, status,
                     latitude, longitude, location_name, description, reported_by,
-                    assigned_unit_id, created_at, updated_at, resolved_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    assigned_unit_id, location_source, location_accuracy, timestamp,
+                    created_at, updated_at, resolved_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     inc_id,
@@ -106,6 +108,9 @@ class IncidentService:
                     data.description or "Emergency incident reported to dispatch.",
                     data.reported_by or "DISPATCH_CENTER",
                     None,
+                    data.location_source or "GPS",
+                    data.location_accuracy,
+                    ts,
                     now_iso,
                     now_iso,
                     None,

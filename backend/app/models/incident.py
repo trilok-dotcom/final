@@ -43,6 +43,9 @@ class Incident(BaseModel):
     description: Optional[str] = None
     reported_by: Optional[str] = "DISPATCH_CENTER"
     assigned_unit_id: Optional[str] = None
+    location_source: Optional[str] = "GPS"
+    location_accuracy: Optional[float] = Field(None, ge=0.0)
+    timestamp: Optional[str] = None
     created_at: str
     updated_at: str
     resolved_at: Optional[str] = None

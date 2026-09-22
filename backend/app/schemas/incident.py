@@ -11,6 +11,9 @@ class IncidentCreate(BaseModel):
     location_name: Optional[str] = None
     description: Optional[str] = None
     reported_by: Optional[str] = "DISPATCH_CENTER"
+    location_source: Optional[str] = "GPS"
+    location_accuracy: Optional[float] = Field(None, ge=0.0)
+    timestamp: Optional[str] = None
 
     @field_validator("incident_type")
 

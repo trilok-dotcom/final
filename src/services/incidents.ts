@@ -45,6 +45,10 @@ export async function createIncident(payload: {
   longitude: number;
   location_name?: string;
   description?: string;
+  reported_by?: string;
+  location_source?: string;
+  location_accuracy?: number;
+  timestamp?: string;
 }): Promise<EmergencyIncident> {
   const res = await fetch(`${API_BASE_URL}/incidents`, {
     method: 'POST',

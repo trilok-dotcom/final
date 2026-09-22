@@ -87,6 +87,14 @@ async def calculate_ai_route(request: AIRouteRequest):
             detail=f"Invalid destination coordinates: [{dest_lat}, {dest_lng}]",
         )
 
+    from ai.georeference import georeference
+    if not georeference.is_within_bounds(start_lat, start_lng) or not georeference.is_within_bounds(dest_lat, dest_lng):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"success": False, "status": "out_of_bounds", "message": "Coordinates outside active satellite area"},
+        )
+
+
     # 2. Call Emergency Routing Service
     try:
         result = emergency_routing_service.calculate_emergency_route(

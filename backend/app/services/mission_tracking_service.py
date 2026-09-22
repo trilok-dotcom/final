@@ -55,11 +55,21 @@ class MissionTrackingService:
         lng: float,
         speed_kmh: float = 0.0,
         heading_degrees: float = 0.0,
+        accuracy: Optional[float] = None,
+        timestamp: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Update rescue unit location, calculate distance remaining, ETA, progress %,
-        persist telemetry, and broadcast over WebSocket.
+        persist telemetry, check route deviation/health, and broadcast over WebSocket.
         """
+        # Validate coordinates & accuracy
+        if not (-90.0 <= lat <= 90.0):
+            raise ValueError(f"Invalid latitude '{lat}'. Must be between -90 and 90.")
+        if not (-180.0 <= lng <= 180.0):
+            raise ValueError(f"Invalid longitude '{lng}'. Must be between -180 and 180.")
+        if accuracy is not None and accuracy < 0:
+            raise ValueError(f"Invalid accuracy '{accuracy}'. Must be >= 0.")
+
         # 1. Fetch target dispatch
         disp = dispatch_service.get_dispatch(dispatch_id)
         if not disp:
@@ -75,6 +85,22 @@ class MissionTrackingService:
         if not unit or not incident:
             raise ValueError("Associated rescue unit or incident record missing.")
 
+        # Stale timestamp protection
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        update_ts = timestamp or now_iso
+
+        if timestamp and unit.get("last_updated"):
+            try:
+                # Compare ISO strings or datetime objects
+                t_incoming = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                t_last = datetime.fromisoformat(unit["last_updated"].replace("Z", "+00:00"))
+                if t_incoming < t_last:
+                    raise ValueError(f"Stale GPS update rejected: timestamp '{timestamp}' is older than last recorded position '{unit['last_updated']}'.")
+            except ValueError as ve:
+                if "Stale GPS" in str(ve):
+                    raise
+                pass  # If timestamp format parsing fails, fall back gracefully
+
         inc_lat = float(incident["latitude"])
         inc_lng = float(incident["longitude"])
 
@@ -86,7 +112,6 @@ class MissionTrackingService:
 
         # 3. Calculate distance remaining to incident
         if coords and len(coords) >= 2:
-            # Find index of closest coordinate point along polyline
             min_dist_km = float("inf")
             closest_idx = 0
             for idx, (c_lng, c_lat) in enumerate(coords):
@@ -95,14 +120,12 @@ class MissionTrackingService:
                     min_dist_km = d
                     closest_idx = idx
 
-            # Calculate remaining polyline segment lengths from closest_idx to end
             dist_rem_m = haversine_distance_km(lat, lng, coords[closest_idx][1], coords[closest_idx][0]) * 1000.0
             for k in range(closest_idx, len(coords) - 1):
                 p1_lng, p1_lat = coords[k]
                 p2_lng, p2_lat = coords[k + 1]
                 dist_rem_m += haversine_distance_km(p1_lat, p1_lng, p2_lat, p2_lng) * 1000.0
         else:
-            # Fallback to direct Haversine distance
             dist_rem_m = haversine_distance_km(lat, lng, inc_lat, inc_lng) * 1000.0
 
         dist_rem_m = round(max(0.0, dist_rem_m), 1)
@@ -120,8 +143,6 @@ class MissionTrackingService:
 
         eta_sec = int(round(dist_rem_m / speed_mps)) if speed_mps > 0 else 0
 
-        now_iso = datetime.utcnow().isoformat() + "Z"
-
         # 6. Update rescue unit current location in SQLite
         conn = get_db_connection()
         try:
@@ -129,10 +150,10 @@ class MissionTrackingService:
             cursor.execute(
                 """
                 UPDATE rescue_units
-                SET latitude = ?, longitude = ?, speed_kmh = ?, heading_degrees = ?, last_updated = ?, updated_at = ?
+                SET latitude = ?, longitude = ?, speed_kmh = ?, heading_degrees = ?, accuracy = ?, last_updated = ?, updated_at = ?
                 WHERE id = ?;
                 """,
-                (lat, lng, speed_kmh, heading_degrees, now_iso, now_iso, unit["id"]),
+                (lat, lng, speed_kmh, heading_degrees, accuracy, update_ts, now_iso, unit["id"]),
             )
 
             # 7. Insert mission update telemetry record
@@ -141,8 +162,8 @@ class MissionTrackingService:
                 """
                 INSERT INTO mission_updates (
                     id, dispatch_id, rescue_unit_id, incident_id, latitude, longitude, status,
-                    distance_remaining_meters, eta_seconds, progress_percent, speed_kmh, heading_degrees, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    distance_remaining_meters, eta_seconds, progress_percent, speed_kmh, heading_degrees, accuracy, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     telemetry_id,
@@ -157,27 +178,44 @@ class MissionTrackingService:
                     progress_pct,
                     speed_kmh,
                     heading_degrees,
-                    now_iso,
+                    accuracy,
+                    update_ts,
                 ),
             )
             conn.commit()
         finally:
             conn.close()
 
-        # 8. Broadcast update over WebSocket
+        # 8. Trigger Route Health Check & Route Deviation Rerouting Evaluation
+        health_eval = None
+        reroute_recommendation = None
+        try:
+            from app.services.route_health_service import route_health_service
+            from app.services.reroute_service import reroute_service
+            health_eval = route_health_service.evaluate_route_health(disp["id"])
+            if health_eval and health_eval.get("decision") in ("REROUTE_RECOMMENDED", "CRITICAL_REROUTE"):
+                reroute_recommendation = reroute_service.generate_reroute_recommendation(
+                    disp["id"], trigger="ROUTE_DEVIATION"
+                )
+        except Exception as rh_err:
+            logger.warning(f"Route health evaluation on location update: {rh_err}")
+
+        # 9. Broadcast update over WebSocket
         payload = {
             "type": "MISSION_UPDATE",
             "dispatch_id": disp["id"],
             "unit_id": unit["id"],
             "incident_id": incident["id"],
             "status": disp_status,
-            "location": {"lat": lat, "lng": lng},
+            "location": {"lat": lat, "lng": lng, "accuracy": accuracy},
             "speed_kmh": speed_kmh,
             "heading_degrees": heading_degrees,
             "distance_remaining_meters": dist_rem_m,
             "eta_seconds": eta_sec,
             "progress_percent": progress_pct,
-            "timestamp": now_iso,
+            "timestamp": update_ts,
+            "route_health": health_eval.get("current_route_health") if health_eval else None,
+            "reroute_recommendation": reroute_recommendation,
         }
         try:
             loop = asyncio.get_running_loop()
@@ -197,6 +235,7 @@ class MissionTrackingService:
                 "lng": lng,
                 "speed_kmh": speed_kmh,
                 "heading_degrees": heading_degrees,
+                "accuracy": accuracy,
             },
             "incident": {
                 "id": incident["id"],
@@ -209,7 +248,9 @@ class MissionTrackingService:
             "eta_seconds": eta_sec,
             "progress_percent": progress_pct,
             "risk_level": disp.get("risk_level", "low"),
-            "average_ai_confidence": disp.get("average_confidence", 0.85),
+            "average_ai_confidence": disp.get("average_confidence", 1.0),
+            "route_health": health_eval.get("current_route_health") if health_eval else None,
+            "reroute_recommendation": reroute_recommendation,
             "route_geometry": route_geom,
         }
 

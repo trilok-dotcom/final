@@ -16,4 +16,3 @@ numpy
 networkx>=3.0
 matplotlib
 tqdm
-

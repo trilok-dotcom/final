@@ -1,8 +1,7 @@
 import React from 'react';
 import { Image as ImageIcon, Eye, GitBranch, Layers, Cpu, CheckCircle, Loader2 } from 'lucide-react';
 import type { AnalyzeSatelliteResponse } from '../../types/ai';
-
-const BACKEND_URL = 'http://localhost:8000';
+import { getBackendOrigin } from '../../services/api';
 
 interface AnalysisPreviewProps {
   result?: AnalyzeSatelliteResponse | null;
@@ -18,7 +17,8 @@ export const AnalysisPreview: React.FC<AnalysisPreviewProps> = ({
   const getFullUrl = (path?: string) => {
     if (!path) return undefined;
     if (path.startsWith('http')) return path;
-    return `${BACKEND_URL}${path.startsWith('/') ? path : '/' + path}`;
+    const backendOrigin = getBackendOrigin();
+    return `${backendOrigin}${path.startsWith('/') ? path : '/' + path}`;
   };
 
   const viewports = [

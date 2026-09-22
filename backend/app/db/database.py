@@ -6,9 +6,17 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from app.utils.logging import get_logger
 
+import os
+
 logger = get_logger("app.db.database")
 
-DB_FILE = Path(__file__).resolve().parent.parent.parent / "resqroute.db"
+_db_env = os.getenv("DATABASE_PATH") or os.getenv("DATABASE_URL")
+if _db_env:
+    if _db_env.startswith("sqlite:///"):
+        _db_env = _db_env.replace("sqlite:///", "")
+    DB_FILE = Path(_db_env)
+else:
+    DB_FILE = Path(__file__).resolve().parent.parent.parent / "resqroute.db"
 
 
 def get_db_connection() -> sqlite3.Connection:
@@ -41,6 +49,9 @@ def init_db() -> None:
                 description TEXT,
                 reported_by TEXT DEFAULT 'DISPATCH_CENTER',
                 assigned_unit_id TEXT,
+                location_source TEXT DEFAULT 'GPS',
+                location_accuracy REAL,
+                timestamp TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 resolved_at TEXT,
@@ -48,6 +59,13 @@ def init_db() -> None:
             );
             """
         )
+
+        # Migrate incidents table if created previously
+        for col, col_type in [("location_source", "TEXT DEFAULT 'GPS'"), ("location_accuracy", "REAL"), ("timestamp", "TEXT")]:
+            try:
+                cursor.execute(f"ALTER TABLE incidents ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
 
         # 2. Rescue Units Table
         cursor.execute(
@@ -65,6 +83,7 @@ def init_db() -> None:
                 current_incident_id TEXT,
                 speed_kmh REAL DEFAULT 0.0,
                 heading_degrees REAL DEFAULT 0.0,
+                accuracy REAL,
                 last_updated TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -73,19 +92,12 @@ def init_db() -> None:
             """
         )
 
-        # Ensure speed_kmh, heading_degrees, last_updated exist if table was previously created
-        try:
-            cursor.execute("ALTER TABLE rescue_units ADD COLUMN speed_kmh REAL DEFAULT 0.0;")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE rescue_units ADD COLUMN heading_degrees REAL DEFAULT 0.0;")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE rescue_units ADD COLUMN last_updated TEXT;")
-        except Exception:
-            pass
+        # Ensure speed_kmh, heading_degrees, accuracy, last_updated exist if table was previously created
+        for col, col_type in [("speed_kmh", "REAL DEFAULT 0.0"), ("heading_degrees", "REAL DEFAULT 0.0"), ("accuracy", "REAL"), ("last_updated", "TEXT")]:
+            try:
+                cursor.execute(f"ALTER TABLE rescue_units ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
 
         # 3. Dispatches / Missions Table
         cursor.execute(
@@ -132,6 +144,7 @@ def init_db() -> None:
                 progress_percent REAL DEFAULT 0.0,
                 speed_kmh REAL DEFAULT 0.0,
                 heading_degrees REAL DEFAULT 0.0,
+                accuracy REAL,
                 timestamp TEXT NOT NULL,
                 FOREIGN KEY (dispatch_id) REFERENCES dispatches(id) ON DELETE CASCADE,
                 FOREIGN KEY (rescue_unit_id) REFERENCES rescue_units(id) ON DELETE CASCADE,
@@ -139,6 +152,11 @@ def init_db() -> None:
             );
             """
         )
+
+        try:
+            cursor.execute("ALTER TABLE mission_updates ADD COLUMN accuracy REAL;")
+        except Exception:
+            pass
 
         # 5. Resource Assignments Table (Stage 8B)
         cursor.execute(
@@ -334,7 +352,50 @@ def init_db() -> None:
             """
         )
 
-        # 12. Add simulation_session_id column to existing tables if missing
+        # 12. Stage 7E Road Condition Assessment Tables
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS road_condition_assessments (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                pre_image_path TEXT,
+                post_image_path TEXT,
+                roads_analyzed INTEGER DEFAULT 0,
+                safe_count INTEGER DEFAULT 0,
+                degraded_count INTEGER DEFAULT 0,
+                blocked_count INTEGER DEFAULT 0,
+                unknown_count INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                metadata_json TEXT
+            );
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS road_condition_segments (
+                id TEXT PRIMARY KEY,
+                assessment_id TEXT NOT NULL,
+                edge_id TEXT NOT NULL,
+                start_node TEXT,
+                end_node TEXT,
+                pre_length REAL DEFAULT 0.0,
+                post_length REAL DEFAULT 0.0,
+                preservation_ratio REAL DEFAULT 1.0,
+                pre_confidence REAL DEFAULT 1.0,
+                post_confidence REAL DEFAULT 1.0,
+                connectivity TEXT DEFAULT 'CONNECTED',
+                condition TEXT NOT NULL,
+                condition_score REAL DEFAULT 100.0,
+                traversable INTEGER DEFAULT 1,
+                geometry_json TEXT,
+                FOREIGN KEY (assessment_id) REFERENCES road_condition_assessments(id) ON DELETE CASCADE
+            );
+            """
+        )
+
+        # 13. Add simulation_session_id column to existing tables if missing
         for tbl in [
             "incidents",
             "rescue_units",
@@ -345,13 +406,19 @@ def init_db() -> None:
             "route_evaluations",
             "reroute_events",
             "command_center_alerts",
+            "road_condition_assessments",
         ]:
             try:
                 cursor.execute(f"ALTER TABLE {tbl} ADD COLUMN simulation_session_id TEXT;")
             except Exception:
                 pass
 
-        # 13. Create Indexes
+        # 14. Create Indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_road_cond_assess_active ON road_condition_assessments(is_active);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_road_cond_assess_created ON road_condition_assessments(created_at);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_road_cond_seg_assess ON road_condition_segments(assessment_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_road_cond_seg_condition ON road_condition_segments(condition);")
+
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_incidents_created_at ON incidents(created_at);")

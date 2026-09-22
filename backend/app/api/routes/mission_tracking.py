@@ -6,18 +6,24 @@ router = APIRouter()
 
 
 @router.post("/dispatches/{dispatch_id}/location", summary="Update Rescue Unit Live Telemetry Location")
+@router.post("/missions/{dispatch_id}/location", summary="Update Rescue Unit Live Telemetry Location (Alias)")
 async def update_location(dispatch_id: str, payload: LocationUpdatePayload):
     """
-    Update rescue unit live latitude, longitude, speed, and heading telemetry.
+    Update rescue unit live latitude, longitude, speed, heading, and accuracy telemetry.
     Recalculates distance remaining, ETA, and progress percentage, and broadcasts over WebSocket.
     """
     try:
+        lat = payload.get_lat()
+        lng = payload.get_lng()
+        accuracy = payload.get_accuracy()
         result = mission_tracking_service.update_location(
             dispatch_id=dispatch_id,
-            lat=payload.lat,
-            lng=payload.lng,
+            lat=lat,
+            lng=lng,
             speed_kmh=payload.speed_kmh or 0.0,
             heading_degrees=payload.heading_degrees or 0.0,
+            accuracy=accuracy,
+            timestamp=payload.timestamp,
         )
         return result
     except ValueError as e:
@@ -28,6 +34,7 @@ async def update_location(dispatch_id: str, payload: LocationUpdatePayload):
 
 
 @router.get("/dispatches/{dispatch_id}/live", summary="Get Live Dispatch Mission Telemetry")
+@router.get("/missions/{dispatch_id}/live", summary="Get Live Dispatch Mission Telemetry (Alias)")
 async def get_live_mission(dispatch_id: str):
     """
     Retrieve real-time telemetry, unit location, distance remaining, progress %, and ETA for active mission.

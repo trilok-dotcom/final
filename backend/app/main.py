@@ -22,6 +22,7 @@ from app.api.routes import (
     command_center,
     simulation,
     evaluation,
+    road_condition,
 )
 from app.services.ai_service import init_road_predictor
 from app.db.database import init_db
@@ -116,7 +117,13 @@ app.include_router(simulation.router, prefix=settings.API_V1_STR, tags=["Disaste
 app.include_router(evaluation.router, prefix="/api", tags=["System Evaluation"])
 app.include_router(evaluation.router, prefix=settings.API_V1_STR, tags=["System Evaluation"])
 
+app.include_router(road_condition.router, prefix="/api", tags=["Post-Disaster Road Condition"])
+app.include_router(road_condition.router, prefix=settings.API_V1_STR, tags=["Post-Disaster Road Condition"])
+
+app.include_router(health.router, tags=["Health"])
+app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(health.router, prefix=settings.API_V1_STR, tags=["Health"])
+
 app.include_router(routing.router, prefix=settings.API_V1_STR, tags=["Routing"])
 app.include_router(predict.router, prefix=settings.API_V1_STR, tags=["AI Prediction"])
 app.include_router(road_network.router, prefix=settings.API_V1_STR, tags=["Road Network"])

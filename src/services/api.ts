@@ -4,7 +4,30 @@
  * Communicates with FastAPI backend running on http://localhost:8000/api/v1
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const getBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    const raw = import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, '');
+    return raw.includes('/api') ? raw : `${raw}/api/v1`;
+  }
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://127.0.0.1:8000/api/v1';
+    }
+    return `${window.location.origin}/api/v1`;
+  }
+  return 'http://127.0.0.1:8000/api/v1';
+};
+
+const API_BASE_URL = getBaseUrl();
+
+export const getBackendOrigin = (): string => {
+  try {
+    const url = new URL(API_BASE_URL);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+  }
+};
 
 export class ApiClient {
   static async get<T>(endpoint: string): Promise<T> {

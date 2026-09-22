@@ -78,14 +78,6 @@ class RouteHealthService:
         finally:
             conn.close()
 
-        # Extract current unit coordinates
-        if latest_telemetry:
-            unit_lat = float(latest_telemetry["latitude"])
-            unit_lng = float(latest_telemetry["longitude"])
-        else:
-            unit_lat = float(unit.get("latitude") or 12.9716)
-            unit_lng = float(unit.get("longitude") or 77.5946)
-
         # Baseline parameters from dispatch
         route_id = disp.get("route_id") or f"route-{dispatch_id[:8]}"
         dist_m = float(disp.get("distance_meters") or 0.0)
@@ -94,6 +86,17 @@ class RouteHealthService:
         risk_lvl = (disp.get("risk_level") or "low").upper()
         route_geom = disp.get("route_geometry") or {}
         coords = route_geom.get("coordinates", [])
+
+        # Extract current unit coordinates
+        if latest_telemetry:
+            unit_lat = float(latest_telemetry["latitude"])
+            unit_lng = float(latest_telemetry["longitude"])
+        elif coords and len(coords) >= 1:
+            unit_lat = float(coords[0][1])
+            unit_lng = float(coords[0][0])
+        else:
+            unit_lat = float(unit.get("latitude") or 12.9716)
+            unit_lng = float(unit.get("longitude") or 77.5946)
 
         # Current telemetry ETA (or remaining duration)
         if latest_telemetry and latest_telemetry.get("eta_seconds"):
@@ -107,6 +110,23 @@ class RouteHealthService:
             deviation_m = round(_min_distance_to_polyline_meters(unit_lat, unit_lng, coords), 1)
 
         is_connected = True
+
+        # Check active post-disaster road condition assessment (Stage 7E)
+        post_disaster_blocked = False
+        try:
+            from app.services.road_condition_service import road_condition_service
+            active_assessment = road_condition_service.get_active_assessment()
+            if active_assessment and active_assessment.get("blocked_count", 0) > 0:
+                for seg in active_assessment.get("segments", []):
+                    if seg.get("condition") == "BLOCKED" and not seg.get("traversable", True):
+                        post_disaster_blocked = True
+                        break
+        except Exception as err:
+            logger.warning(f"Could not check active assessment in route health: {err}")
+
+        if post_disaster_blocked:
+            is_connected = False
+            avg_conf = min(avg_conf, 0.35)
 
         # Apply Simulation Overrides if requested
         is_simulated = False
@@ -131,6 +151,7 @@ class RouteHealthService:
                 avg_conf = 0.63
             elif scenario_upper == "UNIT_DEVIATION":
                 deviation_m = 185.5  # 185.5m away
+
 
         # Calculate Deterministic Explainable Scores (100% total)
         # 1. AI Confidence Component (30%)
@@ -176,6 +197,10 @@ class RouteHealthService:
             degradation_detected = True
             reasons.append("Route network segment is disconnected or impassable")
             reason_codes.append("ROUTE_DISCONNECTED")
+            if post_disaster_blocked:
+                reasons.append("Post-disaster road assessment detected blocked route segment")
+                reason_codes.append("POST_DISASTER_ROAD_BLOCKED")
+
 
         if avg_conf < CONFIDENCE_THRESHOLD:
             degradation_detected = True

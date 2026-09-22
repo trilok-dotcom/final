@@ -5,6 +5,8 @@ import {
   Navigation, 
   AlertTriangle, 
   ShieldCheck, 
+  ShieldAlert,
+  Truck,
   Cpu, 
   Activity, 
   Settings, 
@@ -28,6 +30,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
   const navItems = [
+    {
+      label: 'Post-Disaster Assessment',
+      path: '/post-disaster-assessment',
+      icon: ShieldAlert,
+      badge: 'ST 7E',
+      badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40',
+    },
+    {
+      label: 'Request Rescue',
+      path: '/request-rescue',
+      icon: ShieldAlert,
+      badge: 'GPS VICTIM',
+      badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40',
+    },
+    {
+      label: 'Rescuer Mode',
+      path: '/rescuer-mode',
+      icon: Truck,
+      badge: 'ST 7D',
+      badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+    },
+
     {
       label: 'Evaluation Center',
       path: '/evaluation-center',

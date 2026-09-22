@@ -7,12 +7,26 @@ import torch.nn as nn
 import segmentation_models_pytorch as smp
 
 # Ensure backend directory is in sys.path
+import os
+
 AI_DIR = Path(__file__).resolve().parent.parent
 BACKEND_DIR = AI_DIR.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-DEFAULT_MODEL_PATH = AI_DIR / "models" / "resqroute_unet_resnet34_v2_best.pth"
+def _resolve_default_model_path() -> Path:
+    env_path = os.getenv("MODEL_PATH")
+    if env_path and Path(env_path).exists():
+        return Path(env_path)
+    primary = AI_DIR / "models" / "resqroute_unet_resnet34_v2_best.pth"
+    if primary.exists():
+        return primary
+    fallback = AI_DIR / "weights" / "best_model.pth"
+    if fallback.exists():
+        return fallback
+    return primary
+
+DEFAULT_MODEL_PATH = _resolve_default_model_path()
 
 
 def get_inference_device() -> torch.device:
