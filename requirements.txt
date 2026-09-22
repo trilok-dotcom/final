@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 httpx>=0.27.0
@@ -9,7 +10,7 @@ torch
 torchvision
 segmentation-models-pytorch
 albumentations
-opencv-python
+opencv-python-headless
 scikit-image
 pillow
 numpy

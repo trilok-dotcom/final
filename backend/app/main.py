@@ -45,11 +45,6 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing RESQROUTE AI Engine...")
     try:
         init_road_predictor()
-        # Warm up legacy predictor if present for backward compatibility
-        try:
-            predictor.load_model()
-        except Exception:
-            pass
     except Exception as e:
         logger.error(f"Failed to load AI model on startup: {e}")
     yield
