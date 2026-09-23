@@ -51,14 +51,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'ST 7D',
       badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
     },
-
-    {
-      label: 'Evaluation Center',
-      path: '/evaluation-center',
-      icon: Activity,
-      badge: 'ST 10',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-    },
     {
       label: 'Command Center',
       path: '/command-center',

@@ -1,8 +1,10 @@
+import uuid
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Query, Body, status
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, Query, Body, File, UploadFile, Form, Request, status
 from pydantic import BaseModel
 
-from app.services.road_condition_service import road_condition_service
+from app.services.road_condition_service import road_condition_service, BACKEND_DIR, AI_DIR
 from app.utils.logging import get_logger
 
 logger = get_logger("app.api.routes.road_condition")
@@ -17,17 +19,60 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/road-condition/analyze", status_code=status.HTTP_200_OK)
-def analyze_road_condition(payload: Optional[AnalyzeRequest] = Body(None)) -> Dict[str, Any]:
-    """Analyze post-disaster road conditions comparing baseline and post-disaster satellite imagery."""
+async def analyze_road_condition(
+    request: Request,
+    before_image: Optional[UploadFile] = File(None),
+    after_image: Optional[UploadFile] = File(None),
+    demo_scenario: Optional[str] = Form(None),
+) -> Dict[str, Any]:
+    """Analyze post-disaster road conditions comparing baseline and post-disaster satellite imagery.
+    
+    Supports both multipart/form-data file uploads (before_image, after_image) and JSON payloads.
+    """
     try:
-        pre_img = payload.pre_image_name if payload else None
-        post_img = payload.post_image_name if payload else None
-        demo = payload.demo_scenario if payload else "SECTOR_4_FLOOD"
+        pre_file_path: Optional[Path] = None
+        post_file_path: Optional[Path] = None
+        scenario: Optional[str] = demo_scenario or "SECTOR_4_FLOOD"
+
+        content_type = request.headers.get("content-type", "")
+
+        if "multipart/form-data" in content_type:
+            uploads_dir = BACKEND_DIR / "outputs" / "uploads"
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+            session_id = uuid.uuid4().hex[:8]
+
+            if before_image and before_image.filename:
+                before_ext = Path(before_image.filename).suffix or ".png"
+                pre_file_path = uploads_dir / f"before_{session_id}{before_ext}"
+                content = await before_image.read()
+                with open(pre_file_path, "wb") as buffer:
+                    buffer.write(content)
+
+            if after_image and after_image.filename:
+                after_ext = Path(after_image.filename).suffix or ".png"
+                post_file_path = uploads_dir / f"after_{session_id}{after_ext}"
+                content = await after_image.read()
+                with open(post_file_path, "wb") as buffer:
+                    buffer.write(content)
+        else:
+            # Parse JSON body for backward compatibility
+            try:
+                body_json = await request.json()
+                if isinstance(body_json, dict):
+                    pre_name = body_json.get("pre_image_name")
+                    post_name = body_json.get("post_image_name")
+                    scenario = body_json.get("demo_scenario", "SECTOR_4_FLOOD")
+                    if pre_name:
+                        pre_file_path = AI_DIR / "datasets" / "processed" / "images" / pre_name
+                    if post_name:
+                        post_file_path = AI_DIR / "datasets" / "processed" / "images" / post_name
+            except Exception:
+                pass
 
         result = road_condition_service.analyze_road_condition(
-            pre_image=pre_img,
-            post_image=post_img,
-            demo_scenario=demo,
+            pre_image=pre_file_path,
+            post_image=post_file_path,
+            demo_scenario=scenario,
         )
         return result
     except Exception as e:

@@ -477,51 +477,5 @@ def init_db() -> None:
 
 
 def _seed_demo_data(conn: sqlite3.Connection) -> None:
-    """Seed initial development demo incidents and rescue units if tables are empty."""
-    cursor = conn.cursor()
-    
-    # Check if rescue units exist
-    cursor.execute("SELECT COUNT(*) FROM rescue_units;")
-    unit_count = cursor.fetchone()[0]
-
-    now_iso = datetime.utcnow().isoformat() + "Z"
-
-    if unit_count == 0:
-        logger.info("Seeding initial demo rescue units...")
-        demo_units = [
-            ("unit-1", "AMB-01", "AMBULANCE", "AVAILABLE", 12.979766, 77.583438, "Central Ambulance 01", 3, json.dumps(["medical", "first_aid", "patient_transport"]), None, 0.0, 0.0, now_iso, now_iso, now_iso),
-            ("unit-2", "AMB-02", "AMBULANCE", "EN_ROUTE", 12.979609, 77.582930, "Metro Ambulance 02", 3, json.dumps(["medical", "trauma_support"]), None, 45.0, 180.0, now_iso, now_iso, now_iso),
-            ("unit-3", "FIRE-01", "FIRE_TRUCK", "AVAILABLE", 12.979766, 77.583438, "Squad Fire Engine 01", 5, json.dumps(["fire_suppression", "rescue", "hazmat"]), None, 0.0, 0.0, now_iso, now_iso, now_iso),
-            ("unit-4", "POL-01", "POLICE", "AVAILABLE", 12.979609, 77.582930, "Rapid Police Unit 01", 2, json.dumps(["traffic_control", "perimeter_security"]), None, 0.0, 0.0, now_iso, now_iso, now_iso),
-            ("unit-5", "RES-01", "RESCUE_TEAM", "ON_SCENE", 12.966602, 77.599961, "Urban Search & Rescue Team 01", 6, json.dumps(["search_rescue", "collapsed_structure", "first_aid"]), None, 0.0, 0.0, now_iso, now_iso, now_iso),
-        ]
-        cursor.executemany(
-            """
-            INSERT INTO rescue_units (id, unit_code, unit_type, status, latitude, longitude, name, crew_size, capabilities, current_incident_id, speed_kmh, heading_degrees, last_updated, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """,
-            demo_units,
-        )
-        conn.commit()
-
-    # Check if incidents exist
-    cursor.execute("SELECT COUNT(*) FROM incidents;")
-    incident_count = cursor.fetchone()[0]
-
-    if incident_count == 0:
-        logger.info("Seeding initial demo emergency incidents...")
-        demo_incidents = [
-            ("inc-1", "INC-2026-0001", "FIRE", "CRITICAL", "ACTIVE", 12.9716, 77.5946, "Commercial Complex MG Road", "Large building fire reported on 3rd floor.", "DISPATCH_CENTER", None, now_iso, now_iso, None),
-            ("inc-2", "INC-2026-0002", "MEDICAL", "HIGH", "REPORTED", 12.9780, 77.5850, "North Transit Terminal", "Multiple vehicle collision with injuries.", "DISPATCH_CENTER", None, now_iso, now_iso, None),
-            ("inc-3", "INC-2026-0003", "FLOOD", "CRITICAL", "ACTIVE", 12.9666, 77.5999, "Sector 4 Coastal Zone", "Flash flood inundating road infrastructure.", "DISPATCH_CENTER", "unit-5", now_iso, now_iso, None),
-        ]
-        cursor.executemany(
-            """
-            INSERT INTO incidents (id, incident_code, incident_type, severity, status, latitude, longitude, location_name, description, reported_by, assigned_unit_id, created_at, updated_at, resolved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """,
-            demo_incidents,
-        )
-        # Link unit-5 current_incident_id to inc-3
-        cursor.execute("UPDATE rescue_units SET current_incident_id = 'inc-3' WHERE id = 'unit-5';")
-        conn.commit()
+    """No-op: Automatic dummy data seeding disabled per production setup."""
+    pass

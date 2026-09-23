@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { DashboardPage } from './pages/Dashboard';
 import { RoutePlanningPage } from './pages/RoutePlanning';
@@ -7,7 +7,6 @@ import { RescueUnitsPage } from './pages/RescueUnits';
 import { AIAnalysisPage } from './pages/AIAnalysis';
 import { CommandCenterPage } from './pages/CommandCenter';
 import { SimulationCenterPage } from './pages/SimulationCenter';
-import { EvaluationCenter } from './pages/EvaluationCenter';
 
 import { RequestRescuePage } from './pages/RequestRescue';
 import { RescuerModePage } from './pages/RescuerMode';
@@ -22,7 +21,7 @@ export function App() {
           <Route path="/post-disaster-assessment" element={<PostDisasterAssessmentPage />} />
           <Route path="/request-rescue" element={<RequestRescuePage />} />
           <Route path="/rescuer-mode" element={<RescuerModePage />} />
-          <Route path="/evaluation-center" element={<EvaluationCenter />} />
+          <Route path="/evaluation-center" element={<Navigate to="/" replace />} />
           <Route path="/command-center" element={<CommandCenterPage />} />
           <Route path="/simulation-center" element={<SimulationCenterPage />} />
           <Route path="/route-planning" element={<RoutePlanningPage />} />

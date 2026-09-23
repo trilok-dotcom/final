@@ -18,6 +18,70 @@ NORM_MEAN = np.array(config.NORM_MEAN, dtype=np.float32)
 NORM_STD = np.array(config.NORM_STD, dtype=np.float32)
 
 
+def load_image_raw_rgb(
+    image_input: Union[str, Path, np.ndarray, Image.Image]
+) -> np.ndarray:
+    """Load image input into original RGB uint8 numpy array of shape (H, W, 3) without resizing."""
+    img_rgb: np.ndarray
+
+    if isinstance(image_input, (str, Path)):
+        img_path = Path(image_input)
+        if not img_path.exists():
+            raise FileNotFoundError(f"Satellite image file not found at '{img_path}'")
+        
+        img_bgr = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
+        if img_bgr is None:
+            raise ValueError(f"Failed to read image at '{img_path}'. File may be corrupted or unsupported.")
+        
+        if img_bgr.ndim == 2:
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2RGB)
+        elif img_bgr.ndim == 3 and img_bgr.shape[2] == 4:
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2RGB)
+        elif img_bgr.ndim == 3 and img_bgr.shape[2] == 3:
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        else:
+            raise ValueError(f"Unsupported image shape/channels: {img_bgr.shape}")
+
+    elif isinstance(image_input, Image.Image):
+        img_rgb = np.array(image_input.convert("RGB"))
+
+    elif isinstance(image_input, np.ndarray):
+        if image_input.size == 0:
+            raise ValueError("Input image array is empty.")
+        
+        if image_input.ndim == 2:
+            img_rgb = cv2.cvtColor(image_input, cv2.COLOR_GRAY2RGB)
+        elif image_input.ndim == 3:
+            if image_input.shape[2] == 4:
+                img_rgb = cv2.cvtColor(image_input, cv2.COLOR_RGBA2RGB)
+            elif image_input.shape[2] == 3:
+                img_rgb = image_input.copy()
+            elif image_input.shape[0] in (1, 3, 4):
+                arr = np.transpose(image_input, (1, 2, 0))
+                if arr.shape[2] == 1:
+                    img_rgb = cv2.cvtColor(arr, cv2.COLOR_GRAY2RGB)
+                elif arr.shape[2] == 4:
+                    img_rgb = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
+                else:
+                    img_rgb = arr.copy()
+            else:
+                raise ValueError(f"Unsupported numpy image shape: {image_input.shape}")
+        else:
+            raise ValueError(f"Invalid image array dimensions: {image_input.ndim}D")
+    else:
+        raise TypeError(
+            f"Unsupported image_input type '{type(image_input)}'. Expected str, Path, np.ndarray, or PIL.Image."
+        )
+
+    if img_rgb.dtype != np.uint8:
+        if img_rgb.max() <= 1.0:
+            img_rgb = (img_rgb * 255.0).clip(0, 255).astype(np.uint8)
+        else:
+            img_rgb = img_rgb.clip(0, 255).astype(np.uint8)
+
+    return img_rgb
+
+
 def preprocess_image(
     image_input: Union[str, Path, np.ndarray, Image.Image],
     target_size: Tuple[int, int] = (config.IMAGE_WIDTH, config.IMAGE_HEIGHT),
@@ -38,74 +102,7 @@ def preprocess_image(
             - input_tensor: PyTorch tensor of shape (1, 3, H, W) normalized.
             - original_rgb_512: NumPy RGB uint8 array of shape (H, W, 3) for overlay/visualization.
     """
-    img_rgb: np.ndarray
-
-    # 1. Load image input depending on type
-    if isinstance(image_input, (str, Path)):
-        img_path = Path(image_input)
-        if not img_path.exists():
-            raise FileNotFoundError(f"Satellite image file not found at '{img_path}'")
-        
-        # Read using OpenCV
-        img_bgr = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
-        if img_bgr is None:
-            raise ValueError(f"Failed to read image at '{img_path}'. File may be corrupted or unsupported.")
-        
-        # Handle channels
-        if img_bgr.ndim == 2:
-            # Grayscale -> RGB
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2RGB)
-        elif img_bgr.ndim == 3 and img_bgr.shape[2] == 4:
-            # RGBA -> RGB
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2RGB)
-        elif img_bgr.ndim == 3 and img_bgr.shape[2] == 3:
-            # BGR -> RGB
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        else:
-            raise ValueError(f"Unsupported image shape/channels: {img_bgr.shape}")
-
-    elif isinstance(image_input, Image.Image):
-        # Convert PIL Image to RGB numpy array
-        img_rgb = np.array(image_input.convert("RGB"))
-
-    elif isinstance(image_input, np.ndarray):
-        if image_input.size == 0:
-            raise ValueError("Input image array is empty.")
-        
-        if image_input.ndim == 2:
-            # Grayscale (H, W) -> RGB (H, W, 3)
-            img_rgb = cv2.cvtColor(image_input, cv2.COLOR_GRAY2RGB)
-        elif image_input.ndim == 3:
-            if image_input.shape[2] == 4:
-                # RGBA -> RGB
-                img_rgb = cv2.cvtColor(image_input, cv2.COLOR_RGBA2RGB)
-            elif image_input.shape[2] == 3:
-                img_rgb = image_input.copy()
-            elif image_input.shape[0] in (1, 3, 4):
-                # Channel-first format [C, H, W] -> [H, W, C]
-                arr = np.transpose(image_input, (1, 2, 0))
-                if arr.shape[2] == 1:
-                    img_rgb = cv2.cvtColor(arr, cv2.COLOR_GRAY2RGB)
-                elif arr.shape[2] == 4:
-                    img_rgb = cv2.cvtColor(arr, cv2.COLOR_RGBA2RGB)
-                else:
-                    img_rgb = arr.copy()
-            else:
-                raise ValueError(f"Unsupported numpy image shape: {image_input.shape}")
-        else:
-            raise ValueError(f"Invalid image array dimensions: {image_input.ndim}D")
-
-    else:
-        raise TypeError(
-            f"Unsupported image_input type '{type(image_input)}'. Expected str, Path, np.ndarray, or PIL.Image."
-        )
-
-    # Ensure dtype uint8 range [0, 255]
-    if img_rgb.dtype != np.uint8:
-        if img_rgb.max() <= 1.0:
-            img_rgb = (img_rgb * 255.0).clip(0, 255).astype(np.uint8)
-        else:
-            img_rgb = img_rgb.clip(0, 255).astype(np.uint8)
+    img_rgb = load_image_raw_rgb(image_input)
 
     # 2. Resize image to target_size (512, 512)
     target_w, target_h = target_size
@@ -123,3 +120,4 @@ def preprocess_image(
     input_tensor = torch.from_numpy(tensor_chw).unsqueeze(0).float()
 
     return input_tensor, original_rgb_512
+

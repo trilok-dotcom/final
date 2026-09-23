@@ -153,6 +153,22 @@ async def analyze_satellite_image(file: UploadFile = File(...)):
     pred_overlay_name = Path(pred_res["output_image_paths"]["prediction_overlay.png"]).name
     heatmap_name = Path(pred_res["output_image_paths"]["prediction_heatmap.png"]).name
 
+    # Validate server-side file existence before returning URLs
+    for output_file in [
+        pred_res["output_image_paths"]["prediction_mask.png"],
+        pred_res["output_image_paths"]["prediction_overlay.png"],
+        network_res["skeleton_path"],
+        network_res["overlay_path"],
+        network_res["comparison_path"],
+        network_res["geojson_path"],
+    ]:
+        if not Path(output_file).exists():
+            logger.error(f"Generated output file missing on server: {output_file}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Generated output artifact missing on server: {Path(output_file).name}"
+            )
+
     return AnalyzeSatelliteResponse(
         success=True,
         prediction={

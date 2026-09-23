@@ -19,7 +19,7 @@ export const PageContainer: React.FC<PageContainerProps> = ({ children }) => {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} 
         />
 
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#090d16] relative">
+        <main className="flex-1 flex flex-col overflow-y-auto bg-[#090d16] relative min-h-0">
           {children}
         </main>
       </div>

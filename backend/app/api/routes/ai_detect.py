@@ -151,6 +151,15 @@ async def detect_roads(file: UploadFile = File(...)):
     overlay_bgr = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
     cv2.imwrite(str(overlay_path), overlay_bgr)
 
+    # Server-side existence check
+    for p in [prob_path, mask_path, overlay_path]:
+        if not p.exists():
+            logger.error(f"Generated output file missing on server: {p}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Generated output artifact missing on server: {p.name}"
+            )
+
     # Relative static URLs
     pred_url = f"/outputs/detect_roads/{prob_path.name}"
     mask_url = f"/outputs/detect_roads/{mask_path.name}"

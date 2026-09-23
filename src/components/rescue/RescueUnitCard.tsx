@@ -58,9 +58,22 @@ export const RescueUnitCard: React.FC<RescueUnitCardProps> = ({ unit }) => {
 
       <h4 className="font-semibold text-sm text-slate-200 mt-2.5">{unit.name}</h4>
       <p className="text-xs text-slate-400 mt-1">
-        {unit.capabilities && unit.capabilities.length > 0
-          ? `Capabilities: ${unit.capabilities.join(', ')}`
-          : unit.equipmentSummary || 'Standard tactical rescue unit.'}
+        {(() => {
+          if (!unit.capabilities) return unit.equipmentSummary || 'Standard tactical rescue unit.';
+          let caps: string[] = [];
+          if (Array.isArray(unit.capabilities)) {
+            caps = unit.capabilities;
+          } else if (typeof unit.capabilities === 'string') {
+            try {
+              const parsed = JSON.parse(unit.capabilities);
+              if (Array.isArray(parsed)) caps = parsed;
+              else caps = [unit.capabilities];
+            } catch {
+              caps = [unit.capabilities];
+            }
+          }
+          return caps.length > 0 ? `Capabilities: ${caps.join(', ')}` : (unit.equipmentSummary || 'Standard tactical rescue unit.');
+        })()}
       </p>
 
       <div className="mt-3 pt-2.5 border-t border-slate-800/60 grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-400">

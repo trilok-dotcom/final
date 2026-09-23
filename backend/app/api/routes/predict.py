@@ -86,6 +86,15 @@ async def predict_satellite_image(file: UploadFile = File(...)):
     overlay_path = result["output_image_paths"]["prediction_overlay.png"]
     heatmap_path = result["output_image_paths"]["prediction_heatmap.png"]
 
+    # Server-side existence check
+    for p in [mask_path, overlay_path, heatmap_path]:
+        if not Path(p).exists():
+            logger.error(f"Generated output file missing on server: {p}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Generated output artifact missing on server: {Path(p).name}"
+            )
+
     mask_name = Path(mask_path).name
     overlay_name = Path(overlay_path).name
     heatmap_name = Path(heatmap_path).name

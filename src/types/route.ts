@@ -114,6 +114,9 @@ export interface AIRouteStep {
   location: [number, number]; // [lng, lat]
 }
 
+export type RouteStepDetail = AIRouteStep;
+
+
 export interface AIRouteResponse {
   success: boolean;
   route_id: string;

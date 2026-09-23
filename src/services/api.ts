@@ -50,7 +50,7 @@ export class ApiClient {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error('Network error connecting to RESQROUTE backend API.');
+      throw new Error(`Unable to connect to the RESQROUTE backend API at ${API_BASE_URL}. Check if FastAPI server is running.`);
     }
   }
 
@@ -75,9 +75,32 @@ export class ApiClient {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error('Network error connecting to RESQROUTE backend API.');
+      throw new Error(`Unable to connect to the RESQROUTE backend API at ${API_BASE_URL}. Check if FastAPI server is running.`);
+    }
+  }
+
+  static async postForm<T>(endpoint: string, formData: FormData): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `API request failed with status ${response.status}`);
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Unable to connect to the RESQROUTE backend API at ${API_BASE_URL}. Check if FastAPI server is running.`);
     }
   }
 }
 
 export { API_BASE_URL };
+

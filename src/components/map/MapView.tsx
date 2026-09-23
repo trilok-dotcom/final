@@ -19,6 +19,8 @@ import {
   createRescueUnitMarkerIcon, 
   createLocationPinIcon 
 } from './MapMarker';
+import { geoJsonToLeafletCoordinates } from '../../lib/utils';
+
 
 interface MapViewProps {
   startLocation?: LocationPoint | null;
@@ -76,10 +78,7 @@ const MapController: React.FC<{
   // Fit bounds when route geometry is available
   useEffect(() => {
     if (routeGeometry && routeGeometry.coordinates && routeGeometry.coordinates.length > 0) {
-      // GeoJSON is [lng, lat], convert to Leaflet [lat, lng]
-      const leafletCoords: [number, number][] = routeGeometry.coordinates.map(
-        ([lng, lat]) => [lat, lng]
-      );
+      const leafletCoords = geoJsonToLeafletCoordinates(routeGeometry.coordinates);
       const polylineBounds = L.latLngBounds(leafletCoords);
       map.fitBounds(polylineBounds, { padding: [50, 50] });
     } else if (startLocation && destination) {
@@ -144,6 +143,7 @@ export const MapView: React.FC<MapViewProps> = ({
         return {
           url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxNativeZoom: 19,
         };
     }
   };
@@ -153,14 +153,15 @@ export const MapView: React.FC<MapViewProps> = ({
   // Convert GeoJSON route geometry [lng, lat] to Leaflet polyline coords [lat, lng]
   const leafletPolylineCoords: [number, number][] =
     routeGeometry && routeGeometry.coordinates
-      ? routeGeometry.coordinates.map(([lng, lat]) => [lat, lng])
+      ? geoJsonToLeafletCoordinates(routeGeometry.coordinates)
       : [];
 
   // Convert GeoJSON alternative route geometry [lng, lat] to Leaflet polyline coords [lat, lng]
   const leafletAltPolylineCoords: [number, number][] =
     alternativeRouteGeometry && alternativeRouteGeometry.coordinates
-      ? alternativeRouteGeometry.coordinates.map(([lng, lat]) => [lat, lng])
+      ? geoJsonToLeafletCoordinates(alternativeRouteGeometry.coordinates)
       : [];
+
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-slate-950">
@@ -205,6 +206,7 @@ export const MapView: React.FC<MapViewProps> = ({
           url={activeTile.url}
           attribution={activeTile.attribution}
           maxZoom={19}
+          maxNativeZoom={activeTile.maxNativeZoom || 19}
         />
 
         {/* Candidate AI Alternative Route (Dashed Amber Line) */}
@@ -319,11 +321,26 @@ export const MapView: React.FC<MapViewProps> = ({
                   <div className="text-[11px] text-slate-400 mt-1 space-y-0.5">
                     <div>TYPE: <strong className="text-slate-200">{type}</strong></div>
                     <div>CREW: <strong className="text-slate-200">{unit.crew_size || unit.crewCount || 1} Personnel</strong></div>
-                    {unit.capabilities && unit.capabilities.length > 0 && (
-                      <div className="text-[10px] font-mono text-cyan-300/80">
-                        {unit.capabilities.join(', ')}
-                      </div>
-                    )}
+                    {(() => {
+                      if (!unit.capabilities) return null;
+                      let caps: string[] = [];
+                      if (Array.isArray(unit.capabilities)) {
+                        caps = unit.capabilities;
+                      } else if (typeof unit.capabilities === 'string') {
+                        try {
+                          const parsed = JSON.parse(unit.capabilities);
+                          if (Array.isArray(parsed)) caps = parsed;
+                          else caps = [unit.capabilities];
+                        } catch {
+                          caps = [unit.capabilities];
+                        }
+                      }
+                      return caps.length > 0 ? (
+                        <div className="text-[10px] font-mono text-cyan-300/80">
+                          {caps.join(', ')}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               </Popup>
